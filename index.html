@@ -1,17 +1,10 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>My Kanban Board</title>
-  <link rel="stylesheet" href="styles.css">
-
-  <!-- Firebase App (compat version) -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-  <!-- Firestore Database (compat version) -->
-  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-
-  <!-- Your JS -->
-  <script defer src="script.js"></script>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
 <header>
@@ -19,8 +12,13 @@
   <button id="changeBg">Change Background</button>
 </header>
 
-<div id="board"></div>
-<button class="addListBtn">+ Add New List</button>
+<!-- THIS must match the JS (id="lists") -->
+<div id="lists"></div>
 
+<!-- THIS must match the JS (id="addListBtn") -->
+<button id="addListBtn" class="addListBtn">+ Add New List</button>
+
+<!-- Load script as a module so inline 'import' statements work -->
+<script type="module" src="script.js"></script>
 </body>
 </html>

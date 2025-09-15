@@ -1,11 +1,11 @@
-// top-level ES module imports
+// Firebase imports
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
 import {
   getFirestore, collection, addDoc,
-  updateDoc, deleteDoc, doc, getDocs
+  updateDoc, deleteDoc, doc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
 
-// Your Firebase config
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyBhsiMlfEP_6rdjUDvniqDv3OedZ2MSh8A",
   authDomain: "paotie-s-kanban.firebaseapp.com",
@@ -19,11 +19,10 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
+// Run after DOM ready
 window.addEventListener("DOMContentLoaded", () => {
   const listsContainer = document.getElementById("lists");
   const addListBtn = document.getElementById("addListBtn");
-
-  const taskContainers = {}; // keep track of all list containers
 
   // ---------- CREATE TASK ----------
   function createTaskElement(text, id, listName) {
@@ -46,7 +45,7 @@ window.addEventListener("DOMContentLoaded", () => {
     task.appendChild(taskText);
     task.appendChild(deleteBtn);
 
-    addDragAndDrop(task, id);
+    addDragAndDrop(task, id, listName);
     return task;
   }
 
@@ -54,23 +53,30 @@ window.addEventListener("DOMContentLoaded", () => {
   async function addTask(list, listName) {
     const text = prompt("Enter task:");
     if (text) {
-      const docRef = await addDoc(collection(db, "tasks"), {
-        text,
-        list: listName,
-        createdAt: Date.now()
-      });
-      const task = createTaskElement(text, docRef.id, listName);
-      list.appendChild(task);
+      const tempTask = createTaskElement(text, null, listName);
+      list.appendChild(tempTask);
+
+      try {
+        const docRef = await addDoc(collection(db, "tasks"), {
+          text,
+          list: listName,
+          createdAt: Date.now()
+        });
+
+        // update delete button with Firestore id
+        tempTask.querySelector("button").onclick = async () => {
+          tempTask.remove();
+          await deleteDoc(doc(db, "tasks", docRef.id));
+        };
+      } catch (err) {
+        console.error("Error saving task:", err);
+        tempTask.remove();
+      }
     }
   }
 
   // ---------- CREATE LIST ----------
   function createList(title = "New List") {
-    // If list already exists, return it
-    if (taskContainers[title]) {
-      return taskContainers[title];
-    }
-
     const listContainer = document.createElement("div");
     listContainer.classList.add("list");
 
@@ -89,13 +95,11 @@ window.addEventListener("DOMContentLoaded", () => {
     listContainer.appendChild(addTaskBtn);
 
     listsContainer.appendChild(listContainer);
-
-    taskContainers[title] = taskContainer; // save reference
-    return taskContainer;
+    return listContainer;
   }
 
   // ---------- DRAG & DROP ----------
-  function addDragAndDrop(task, id) {
+  function addDragAndDrop(task, id, listName) {
     task.setAttribute("draggable", true);
 
     task.addEventListener("dragstart", () => {
@@ -105,7 +109,7 @@ window.addEventListener("DOMContentLoaded", () => {
     task.addEventListener("dragend", async () => {
       task.classList.remove("dragging");
       const newList = task.parentElement.parentElement.querySelector("h3").textContent;
-      if (id) {
+      if (id && newList !== listName) {
         await updateDoc(doc(db, "tasks", id), { list: newList });
       }
     });
@@ -128,23 +132,40 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // ---------- LOAD ALL TASKS FROM FIRESTORE ----------
-  async function loadTasks() {
-    const snapshot = await getDocs(collection(db, "tasks"));
-    snapshot.forEach(docSnap => {
-      const data = docSnap.data();
-      const list = createList(data.list); // reuse if exists
-      const task = createTaskElement(data.text, docSnap.id, data.list);
-      list.appendChild(task);
+  // ---------- REALTIME FIRESTORE SYNC ----------
+  function setupRealtimeTasks() {
+    listsContainer.innerHTML = "";
+
+    const defaultLists = ["To Do", "Doing", "Done"];
+    const taskContainers = {};
+
+    // create default lists
+    defaultLists.forEach(title => {
+      const listContainer = createList(title);
+      taskContainers[title] = listContainer.querySelector(".task-container");
+    });
+
+    // listen in real-time
+    onSnapshot(collection(db, "tasks"), (snapshot) => {
+      // clear all tasks
+      Object.values(taskContainers).forEach(c => (c.innerHTML = ""));
+
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+
+        // auto-create new lists if needed
+        if (!taskContainers[data.list]) {
+          const newList = createList(data.list);
+          taskContainers[data.list] = newList.querySelector(".task-container");
+        }
+
+        const task = createTaskElement(data.text, docSnap.id, data.list);
+        taskContainers[data.list].appendChild(task);
+      });
     });
   }
 
   // ---------- INIT ----------
   addListBtn.onclick = () => createList();
-
-  // Create default lists
-  ["To Do", "Doing", "Done"].forEach(title => createList(title));
-
-  // Load tasks from Firestore
-  loadTasks();
+  setupRealtimeTasks();
 });

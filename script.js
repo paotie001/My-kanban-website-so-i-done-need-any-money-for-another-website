@@ -1,7 +1,28 @@
 const listsContainer = document.getElementById("lists");
 const addListBtn = document.getElementById("addListBtn");
 
-function createTaskElement(text) {
+// Import Firebase
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
+import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc }
+  from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
+
+// Your Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyBhsiMlfEP_6rdjUDvniqDv3OedZ2MSh8A",
+  authDomain: "paotie-s-kanban.firebaseapp.com",
+  projectId: "paotie-s-kanban",
+  storageBucket: "paotie-s-kanban.firebasestorage.app",
+  messagingSenderId: "127480033088",
+  appId: "1:127480033088:web:fe8d9fae11e187fe9154a5",
+  measurementId: "G-PK0KT5BH1R"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// ---------- TASK CREATION ----------
+function createTaskElement(text, id, listName) {
   const task = document.createElement("div");
   task.classList.add("task");
 
@@ -13,24 +34,35 @@ function createTaskElement(text) {
   const deleteBtn = document.createElement("button");
   deleteBtn.textContent = "✖";
   deleteBtn.classList.add("delete-btn");
-  deleteBtn.onclick = () => task.remove();
+  deleteBtn.onclick = async () => {
+    task.remove();
+    if (id) {
+      await deleteDoc(doc(db, "tasks", id));
+    }
+  };
 
-  // Put text + delete inside task
   task.appendChild(taskText);
   task.appendChild(deleteBtn);
 
-  addDragAndDrop(task);
+  addDragAndDrop(task, id, text, listName);
   return task;
 }
 
-function addTask(list) {
+// ---------- ADD TASK ----------
+async function addTask(list, listName) {
   const text = prompt("Enter task:");
   if (text) {
-    const task = createTaskElement(text);
+    const docRef = await addDoc(collection(db, "tasks"), {
+      text: text,
+      list: listName,
+      createdAt: Date.now()
+    });
+    const task = createTaskElement(text, docRef.id, listName);
     list.appendChild(task);
   }
 }
 
+// ---------- CREATE LIST ----------
 function createList(title = "New List") {
   const listContainer = document.createElement("div");
   listContainer.classList.add("list");
@@ -43,24 +75,33 @@ function createList(title = "New List") {
 
   const addTaskBtn = document.createElement("button");
   addTaskBtn.textContent = "+ Add Task";
-  addTaskBtn.onclick = () => addTask(taskContainer);
+  addTaskBtn.onclick = () => addTask(taskContainer, title);
 
   listContainer.appendChild(header);
   listContainer.appendChild(taskContainer);
   listContainer.appendChild(addTaskBtn);
 
   listsContainer.appendChild(listContainer);
+  return taskContainer;
 }
 
-function addDragAndDrop(task) {
+// ---------- DRAG & DROP ----------
+function addDragAndDrop(task, id, text, listName) {
   task.setAttribute("draggable", true);
 
   task.addEventListener("dragstart", () => {
     task.classList.add("dragging");
   });
 
-  task.addEventListener("dragend", () => {
+  task.addEventListener("dragend", async () => {
     task.classList.remove("dragging");
+    const newList = task.parentElement.parentElement.querySelector("h3").textContent;
+
+    if (id && newList !== listName) {
+      await updateDoc(doc(db, "tasks", id), {
+        list: newList
+      });
+    }
   });
 }
 
@@ -78,7 +119,26 @@ document.addEventListener("dragover", e => {
   });
 });
 
+// ---------- LOAD TASKS FROM FIRESTORE ----------
+async function loadTasks() {
+  const querySnapshot = await getDocs(collection(db, "tasks"));
+  querySnapshot.forEach((docSnap) => {
+    const data = docSnap.data();
+    const lists = document.querySelectorAll(".list");
+    lists.forEach(list => {
+      if (list.querySelector("h3").textContent === data.list) {
+        const task = createTaskElement(data.text, docSnap.id, data.list);
+        list.querySelector(".task-container").appendChild(task);
+      }
+    });
+  });
+}
+
+// ---------- INIT ----------
 addListBtn.onclick = () => createList();
 
 // Default lists
 ["To Do", "Doing", "Done"].forEach(title => createList(title));
+
+// Load tasks from DB on page load
+window.onload = loadTasks;

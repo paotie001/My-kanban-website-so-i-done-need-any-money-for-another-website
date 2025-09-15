@@ -4,15 +4,23 @@
   <meta charset="UTF-8">
   <title>My Kanban Board</title>
   <link rel="stylesheet" href="styles.css">
+
+  <!-- Firebase App (compat version) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <!-- Firestore Database (compat version) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+  <!-- Your JS -->
+  <script defer src="script.js"></script>
 </head>
 <body>
 <header>
   <h1>My Kanban Board</h1>
   <button id="changeBg">Change Background</button>
 </header>
+
 <div id="board"></div>
 <button class="addListBtn">+ Add New List</button>
 
-<script src="script.js"></script>
 </body>
 </html>
